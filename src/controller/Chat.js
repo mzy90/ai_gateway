@@ -1,0 +1,88 @@
+import VolcanoAIService from "../libs/Volcano/VolcanoAIService.js";
+import MainStore from "../libs/MainStore/MainStore.js";
+import { validateRequest } from "../utils/requestValidator.js";
+
+class ChatController {
+  constructor() {
+    this.aiService = new VolcanoAIService();
+  }
+
+  chat = async (request, reply) => {
+    try {
+      const { accessToken, platform } = validateRequest(request);
+
+      const { question, is_base_info, patient_id, conversation_id } =
+        request.body;
+
+      const mainStore = new MainStore({
+        accessToken,
+        platform,
+      });
+      // 如果没有会话，则创建
+      if (!conversation_id) {
+        return await mainStore.createConversation({ question });
+      }
+
+      // 创建用户基础信息
+      if (is_base_info) {
+        if (!patient_id) {
+          throw new Error(`patient_id 不能为空`);
+        }
+        return await mainStore.setUserInfo({
+          is_base_info,
+          patient_id,
+          conversation_id,
+        });
+      }
+      return await this.ask({ conversation_id, question }, mainStore);
+    } catch (error) {
+      let errorMessage = error.message;
+      return reply.code(error.response?.status || 500).send({
+        success: false,
+        error: errorMessage,
+      });
+    }
+  };
+  diagnostic = async (request, reply) => {
+    try {
+      const { accessToken, platform } = validateRequest(request);
+
+      const { conversation_id } = request.body;
+
+      const mainStore = new MainStore({
+        accessToken,
+        platform,
+      });
+      if (!conversation_id) {
+        throw new Error(`conversation_id 不能为空`);
+      }
+      const messages = mainStore.getConversationPayload({ conversation_id });
+
+      return messages;
+    } catch (error) {
+      let errorMessage = error.message;
+      return reply.code(error.response?.status || 500).send({
+        success: false,
+        error: errorMessage,
+      });
+    }
+  };
+  async ask({ conversation_id, question }, mainStore) {
+    const payloadRes = await mainStore.getAskPayload({
+      conversation_id,
+      question,
+    });
+    const messages = payloadRes.data;
+    const aiResult = await this.aiService.chat(messages, "prompt_ask");
+    if (!aiResult.answer) {
+      throw new Error(`网络错误，请稍后重试`);
+    }
+    const updateResult = await mainStore.setAskResult({
+      conversation_id,
+      answer: aiResult.answer,
+    });
+    return updateResult;
+  }
+}
+
+export default new ChatController();

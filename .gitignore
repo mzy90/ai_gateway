@@ -1,0 +1,25 @@
+# modules
+node_modules/
+package-lock.json
+yarn.lock
+
+# third part local files
+.history/
+
+dist/
+
+# eslint cache file
+.eslintcache
+
+# environment file
+.env.dev
+
+# misc
+.DS_Store
+
+buildInfo.text
+dump.rdb
+node_modules
+/src/controller/AigcBlogGenerator/tmp
+
+cache
