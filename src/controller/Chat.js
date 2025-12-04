@@ -43,37 +43,17 @@ class ChatController {
       });
     }
   };
-  diagnostic = async (request, reply) => {
-    try {
-      const { accessToken, platform } = validateRequest(request);
-
-      const { conversation_id } = request.body;
-
-      const mainStore = new MainStore({
-        accessToken,
-        platform,
-      });
-      if (!conversation_id) {
-        throw new Error(`conversation_id 不能为空`);
-      }
-      const messages = mainStore.getConversationPayload({ conversation_id });
-
-      return messages;
-    } catch (error) {
-      let errorMessage = error.message;
-      return reply.code(error.response?.status || 500).send({
-        success: false,
-        error: errorMessage,
-      });
-    }
-  };
   async ask({ conversation_id, question }, mainStore) {
     const payloadRes = await mainStore.getAskPayload({
       conversation_id,
       question,
     });
-    const messages = payloadRes.data;
-    const aiResult = await this.aiService.chat(messages, "prompt_ask");
+    const { messages, user_id } = payloadRes.data;
+    const aiResult = await this.aiService.chat(messages, "prompt_ask", {
+      conversation_id,
+      user_id,
+      api_name: "ask",
+    });
     if (!aiResult.answer) {
       throw new Error(`网络错误，请稍后重试`);
     }

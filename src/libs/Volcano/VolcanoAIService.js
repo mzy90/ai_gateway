@@ -1,7 +1,8 @@
+// volcanoAIService.js
 import axios from "axios";
 import getPromptConfig from "../../prompts/index.js";
+import addLog from "../../utils/addLog.js";
 
-// 火山AI服务类
 class VolcanoAIService {
   constructor() {
     this.apiKey = process.env.VOLCANO_API_KEY;
@@ -19,55 +20,91 @@ class VolcanoAIService {
     });
   }
 
-  async chatHandler(data) {
-    const response = await this.client.post(this.chatUrl, {
+  async chatHandler(data, requestInfo) {
+    const maxRetries = 2;
+    let attempts = 0;
+    let lastError;
+    const startTime = Date.now();
+
+    while (attempts <= maxRetries) {
+      try {
+        const response = await this.client.post(this.chatUrl, {
+          model: this.model,
+          temperature: 0,
+          ...data,
+        });
+
+        if (response.data.error) {
+          throw new Error(response.data.error.message);
+        }
+
+        const parsedResult = this.parseResult(
+          response.data.choices[0]?.message?.content
+        );
+
+        // === LOG 成功 ===
+        await addLog({
+          user_id: requestInfo?.user_id || 0,
+          api_name: requestInfo?.api_name,
+          model: this.model,
+          request_payload: data,
+          response_payload: response.data,
+          success: 1,
+          retry_count: attempts,
+          duration_ms: Date.now() - startTime,
+        });
+
+        return parsedResult;
+      } catch (error) {
+        lastError = error;
+        attempts++;
+
+        if (attempts > maxRetries) break;
+      }
+    }
+
+    // === LOG 失败 ===
+    await addLog({
+      user_id: requestInfo?.user_id || 0,
+      api_name: "volcano_chat",
+      store_id: requestInfo?.store_id || 0,
       model: this.model,
-      temperature: 0,
-      ...data,
+      request_payload: data,
+      response_payload: null,
+      success: 0,
+      error_message: lastError?.message,
+      retry_count: maxRetries,
+      duration_ms: Date.now() - startTime,
     });
-    return response.data;
+
+    throw lastError;
   }
 
-  async chat(messages, type) {
+  async chat(messages, type, requestInfo) {
     try {
       const payload = this.mergeAIPayload(messages, type);
-      const result = await this.chatHandler(payload);
-      const parsedResult = this.parseResult(
-        result.choices[0]?.message?.content
-      );
-
+      const parsedResult = await this.chatHandler(payload, requestInfo);
       return parsedResult;
     } catch (error) {
-      // 统一的错误格式
-      throw new Error(error.response?.data?.error?.message);
+      throw new Error(error.response?.data?.error?.message || error.message);
     }
   }
 
   parseResult(answerString) {
-    const answer = JSON.parse(answerString);
-
-    if (Array.isArray(answer?.suggestion?.medication_guidance)) {
-      answer.suggestion.medication_guidance.forEach((item) => {
-        if (item?.category && item.category !== "非处方药") {
-          item.drug_name = "****";
-          item.dosage = "该药品为处方药，请到正规医疗机构获取处方后开具";
-          item.course = "-";
-          item.precautions = "-";
-        }
-      });
+    try {
+      const answer = JSON.parse(answerString);
+      return {
+        answer,
+        original_response: answerString,
+      };
+    } catch (error) {
+      throw new Error("返回结构错误");
     }
-    if (answer?.status && answer.status === "collection_complete") {
-      answer["current_question"] = "信息收集完毕";
-    }
-    return {
-      answer: answer,
-      original_response: answerString,
-    };
   }
+
   mergeAIPayload(messages, type) {
-    if (!type) {
-      return { messages };
-    }
+    if (!type) return { messages };
+
     const { prompt, schema } = getPromptConfig(type);
     return {
       messages: [

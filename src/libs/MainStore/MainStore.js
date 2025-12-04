@@ -57,6 +57,12 @@ class MainStore {
     return await this.callMainStore(path);
   }
 
+  // 新增AI调用日志
+  async addLog(data) {
+    const path = "index.php?s=/api/AiGatewayLog/add";
+    return await this.callMainStore(path, data);
+  }
+
   async callMainStore(path, data) {
     const res = await request({
       url: path,

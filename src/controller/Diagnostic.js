@@ -24,11 +24,20 @@ class DiagnosticController {
       const payloadRes = await mainStore.getDiagnosticConversation({
         conversation_id,
       });
-      const messages = payloadRes.data;
+      const { messages, user_id } = payloadRes.data;
 
-      const aiResult = await this.firstDiagnostic({ messages });
+      const aiResult = await this.firstDiagnostic({
+        messages,
+        conversation_id,
+        user_id,
+      });
 
-      const appendResult = await this.secondDiagnostic({ aiResult, messages });
+      const appendResult = await this.secondDiagnostic({
+        aiResult,
+        messages,
+        conversation_id,
+        user_id,
+      });
 
       const mergedResult = this.mergeDiagnostic(aiResult, appendResult);
 
@@ -47,8 +56,12 @@ class DiagnosticController {
   };
 
   // 第一步诊断
-  async firstDiagnostic({ messages }) {
-    const aiResult = await this.aiService.chat(messages, "prompt_diagnosis");
+  async firstDiagnostic({ messages, conversation_id, user_id }) {
+    const aiResult = await this.aiService.chat(messages, "prompt_diagnosis", {
+      conversation_id,
+      user_id,
+      api_name: "firstDiagnostic",
+    });
     if (!aiResult.answer) {
       throw new Error(`网络错误，请稍后重试`);
     }
@@ -56,7 +69,7 @@ class DiagnosticController {
   }
 
   // 第二步补充诊断
-  async secondDiagnostic({ aiResult, messages }) {
+  async secondDiagnostic({ aiResult, messages, conversation_id, user_id }) {
     const xmlQuery = formatConversationForAI(messages);
 
     const payload = [
@@ -77,7 +90,8 @@ ${aiResult.answer.diagnosis.differential_diagnosis}
     ];
     const result = await this.aiService.chat(
       payload,
-      "prompt_diagnosis_append"
+      "prompt_diagnosis_append",
+      { conversation_id, user_id, api_name: "secondDiagnostic" }
     );
 
     return result.answer.results;
