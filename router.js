@@ -8,14 +8,18 @@ async function routes(fastify, options) {
     return { 
       status: 'ok', 
       service: 'volcano-ai-gateway',
-      timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString(),
       version: '1.0.0'
     };
   });
 
   // AI聊天接口
   fastify.post('/api/chat', ChatController.chat);
-  fastify.post('/api/diagnostic', DiagnosticController.diagnostic);
+  fastify.post('/api/diagnostic', {
+    config: {
+      timeout: 90000  // 为这个路由单独设置90秒超时
+    }
+  }, DiagnosticController.diagnostic);
   fastify.post('/api/option', OptionsController.index);
 }
 

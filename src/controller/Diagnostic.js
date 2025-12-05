@@ -99,7 +99,7 @@ ${aiResult.answer.diagnosis.differential_diagnosis}
 
   mergeDiagnostic(aiResult, appendResult) {
     aiResult.answer.diagnosis.differential_diagnosis = appendResult;
-    return JSON.stringify(aiResult.answer);
+    return aiResult.answer;
   }
 }
 

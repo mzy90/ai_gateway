@@ -1,6 +1,7 @@
 import VolcanoAIService from "../libs/Volcano/VolcanoAIService.js";
 import MainStore from "../libs/MainStore/MainStore.js";
 import { validateRequest } from "../utils/requestValidator.js";
+import createPatientPrompt from "../utils/createPatientPrompt.js";
 
 class ChatController {
   constructor() {
@@ -28,11 +29,19 @@ class ChatController {
         if (!patient_id) {
           throw new Error(`patient_id 不能为空`);
         }
-        return await mainStore.setUserInfo({
-          is_base_info,
-          patient_id,
-          conversation_id,
-        });
+        return await this.patient(
+          {
+            is_base_info,
+            patient_id,
+            conversation_id,
+          },
+          mainStore
+        );
+        // return await mainStore.setUserInfo({
+        //   is_base_info,
+        //   patient_id,
+        //   conversation_id,
+        // });
       }
       return await this.ask({ conversation_id, question }, mainStore);
     } catch (error) {
@@ -43,6 +52,38 @@ class ChatController {
       });
     }
   };
+
+  async patient({ is_base_info, patient_id, conversation_id }, mainStore) {
+    const response = await mainStore.getPatientPayload({
+      is_base_info,
+      patient_id,
+      conversation_id,
+    });
+    const preMessages = response.data.messages.messages;
+    const patient = response.data.messages.patient;
+    const user_id = response.data.user_id;
+    const patientStr = createPatientPrompt(patient);
+    const messages = [
+      ...preMessages,
+      {
+        role: "user",
+        content: patientStr,
+      },
+    ];
+    const aiResult = await this.aiService.chat(messages, "prompt_ask", {
+      conversation_id,
+      user_id,
+      api_name: "ask",
+    });
+    const updateResult = await mainStore.setUserInfo({
+      is_base_info,
+      patient_id,
+      conversation_id,
+      answer: aiResult.answer,
+    });
+    return updateResult;
+  }
+
   async ask({ conversation_id, question }, mainStore) {
     const payloadRes = await mainStore.getAskPayload({
       conversation_id,

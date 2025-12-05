@@ -1,23 +1,47 @@
 // volcanoAIService.js
 import axios from "axios";
 import getPromptConfig from "../../prompts/index.js";
-import addLog from "../../utils/addLog.js";
+import { insertLog } from "../../db/log.js";
 
 class VolcanoAIService {
+  // 静态变量，所有实例共享
+  static apiKeys = [];
+  static currentKeyIndex = 0;
+
   constructor() {
-    this.apiKey = process.env.VOLCANO_API_KEY;
+    // 初始化API Keys（只执行一次）
+    if (VolcanoAIService.apiKeys.length === 0) {
+      VolcanoAIService.apiKeys = process.env.VOLCANO_API_KEY
+        ? process.env.VOLCANO_API_KEY.split(',').map(key => key.trim()).filter(key => key)
+        : [];
+      
+      if (VolcanoAIService.apiKeys.length === 0) {
+        throw new Error("VOLCANO_API_KEY环境变量未设置或格式错误");
+      }
+    }
+    
     this.baseUrl = "https://ark.cn-beijing.volces.com/api/v3";
     this.chatUrl = "/chat/completions";
     this.model = "deepseek-v3-1-terminus";
-
+    
+    // 创建基础客户端
     this.client = axios.create({
       baseURL: this.baseUrl,
       headers: {
-        Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
       },
       timeout: 30000,
     });
+  }
+  
+  // 简单的轮询获取下一个key
+  static getNextApiKey() {
+    const key = VolcanoAIService.apiKeys[VolcanoAIService.currentKeyIndex];
+    // 轮询到下一个
+    VolcanoAIService.currentKeyIndex = 
+      (VolcanoAIService.currentKeyIndex + 1) % VolcanoAIService.apiKeys.length;
+    console.log('currentKeyIndex', VolcanoAIService.currentKeyIndex)
+    return key;
   }
 
   async chatHandler(data, requestInfo) {
@@ -28,10 +52,19 @@ class VolcanoAIService {
 
     while (attempts <= maxRetries) {
       try {
+        // 每次请求都使用下一个key
+        const currentApiKey = VolcanoAIService.getNextApiKey();
+        const currentKeyIndex = (VolcanoAIService.currentKeyIndex - 1 + VolcanoAIService.apiKeys.length) % VolcanoAIService.apiKeys.length;
+        
         const response = await this.client.post(this.chatUrl, {
           model: this.model,
           temperature: 0,
           ...data,
+        }, {
+          headers: {
+            Authorization: `Bearer ${currentApiKey}`,
+            "Content-Type": "application/json",
+          },
         });
 
         if (response.data.error) {
@@ -43,7 +76,7 @@ class VolcanoAIService {
         );
 
         // === LOG 成功 ===
-        await addLog({
+        await insertLog({
           user_id: requestInfo?.user_id || 0,
           api_name: requestInfo?.api_name,
           model: this.model,
@@ -51,6 +84,7 @@ class VolcanoAIService {
           response_payload: response.data,
           success: 1,
           retry_count: attempts,
+          api_key_index: currentKeyIndex, // 记录使用的key索引
           duration_ms: Date.now() - startTime,
         });
 
@@ -60,11 +94,14 @@ class VolcanoAIService {
         attempts++;
 
         if (attempts > maxRetries) break;
+        
+        // 等待一下再重试
+        await new Promise(resolve => setTimeout(resolve, 500 * attempts));
       }
     }
 
     // === LOG 失败 ===
-    await addLog({
+    await insertLog({
       user_id: requestInfo?.user_id || 0,
       api_name: "volcano_chat",
       store_id: requestInfo?.store_id || 0,
@@ -74,6 +111,7 @@ class VolcanoAIService {
       success: 0,
       error_message: lastError?.message,
       retry_count: maxRetries,
+      api_key_index: VolcanoAIService.currentKeyIndex, // 记录最后使用的key索引
       duration_ms: Date.now() - startTime,
     });
 
@@ -115,6 +153,14 @@ class VolcanoAIService {
         ...messages,
       ],
       response_format: schema,
+    };
+  }
+  
+  // 获取状态信息
+  static getStatus() {
+    return {
+      totalKeys: VolcanoAIService.apiKeys.length,
+      currentKeyIndex: VolcanoAIService.currentKeyIndex,
     };
   }
 }

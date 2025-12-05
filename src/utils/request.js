@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const baseUrl = process.env.MAIN_STORE_URL;
+console.log('===========', baseUrl, '-===========')
 
 const request = axios.create({
   baseURL: baseUrl,

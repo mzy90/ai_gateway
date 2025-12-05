@@ -3,7 +3,9 @@ import 'dotenv/config'
 import router from './router.js'
 
 const fastify = Fastify({ 
-  logger: true 
+  logger: true,
+  connectionTimeout: 95000,  // 改为35秒（比30秒稍长）
+  requestTimeout: 90000      // 改为30秒（默认超时）
 })
 
 // 基本 CORS 支持

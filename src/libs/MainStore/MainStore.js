@@ -11,15 +11,6 @@ class MainStore {
     const path = "index.php?s=/api/DiagnosticCGateway/createConversation";
     return await this.callMainStore(path, { question });
   }
-  // 设置用户信息
-  async setUserInfo({ is_base_info, patient_id, conversation_id }) {
-    const path = "index.php?s=/api/DiagnosticCGateway/setUserInfo";
-    return await this.callMainStore(path, {
-      is_base_info,
-      patient_id,
-      conversation_id,
-    });
-  }
   // 获取payload
   async getAskPayload({ conversation_id, question }) {
     const path = "index.php?s=/api/DiagnosticCGateway/getAskPayload";
@@ -51,17 +42,29 @@ class MainStore {
     return await this.callMainStore(path, { conversation_id });
   }
 
+  // 获取就诊人员
+  async getPatientPayload({ is_base_info, patient_id, conversation_id }) {
+    const path = `index.php?s=/api/DiagnosticCGateway/getPatientPayload`;
+    return await this.callMainStore(path, { is_base_info, patient_id, conversation_id });
+  }
+
+  // 设置用户信息
+  async setUserInfo({ is_base_info, patient_id, conversation_id, answer }) {
+    const path = "index.php?s=/api/DiagnosticCGateway/setUserInfo";
+    return await this.callMainStore(path, {
+      is_base_info,
+      patient_id,
+      conversation_id,
+      answer
+    });
+  }
+
   // 获取用户信息
   async userInfo() {
     const path = "index.php?s=/api/user/cgateway_info";
     return await this.callMainStore(path);
   }
 
-  // 新增AI调用日志
-  async addLog(data) {
-    const path = "index.php?s=/api/AiGatewayLog/add";
-    return await this.callMainStore(path, data);
-  }
 
   async callMainStore(path, data) {
     const res = await request({
