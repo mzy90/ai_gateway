@@ -26,7 +26,8 @@ class Login {
       reply.setCookie("token", token, {
         path: "/",
         httpOnly: true,
-        secure: false,   // 本地必须 false，生产环境再改 true
+        secure: true,      // HTTPS 必须 true
+        sameSite: "none",  // 跨域必须 none
         maxAge: 7 * 24 * 60 * 60,
       });
 
