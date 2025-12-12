@@ -33,9 +33,18 @@ export async function getRecordList({ channel_id, mobile, page, pageSize }) {
      LIMIT ?, ?`,
     [...params, offset, pageSize]
   );
+  const _list = list.map(i => {
+    const _item = {...i}
+    delete _item.mobile
+    _item.user_info = {
+        nick_name: i.user_info.nick_name,
+        mobile: i.user_info.mobile
+      }
+    return _item
+  })
 
   return {
-    list,
+    list: _list,
     page,
     pageSize,
     total,
