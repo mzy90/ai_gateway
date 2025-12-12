@@ -24,7 +24,7 @@ export default {
 该部分针对诊断提出专业的建议，包括用药、检查及生活方式调整。
 * **用药指导 (medication_guidance):** **一个包含多个用药建议对象的数组。每个对象需包含以下字段：**
     * drug_name (药品名称)
-    * category (药物类别，如“处方药”、“非处方药”)
+    * category (药物类别，“处方药”或“非处方药”)
     * dosage (用法用量，如“20mg 每日1次餐前口服”)
     * course (疗程，如“7天”)
     * precautions (注意事项)
@@ -207,6 +207,7 @@ export default {
                     category: {
                       description: "药物类别，如处方药、非处方药",
                       type: "string",
+                      enum: ["处方药", "非处方药"],
                     },
                     course: {
                       description: "疗程，如“7天”",

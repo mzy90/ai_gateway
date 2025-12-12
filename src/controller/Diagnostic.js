@@ -2,6 +2,7 @@ import VolcanoAIService from "../libs/Volcano/VolcanoAIService.js";
 import MainStore from "../libs/MainStore/MainStore.js";
 import { validateRequest } from "../utils/requestValidator.js";
 import formatConversationForAI from "../utils/formatConversationForAITS.js";
+import { insertRecord } from "../db/record.js";
 
 class DiagnosticController {
   constructor() {
@@ -24,17 +25,19 @@ class DiagnosticController {
       const payloadRes = await mainStore.getDiagnosticConversation({
         conversation_id,
       });
-      const { messages, user_id } = payloadRes.data;
+      const { messages, user_info, mobile } = payloadRes.data;
+      const { user_id, channel_id } = user_info;
+      const _messages = this.getPureMessages(messages)
 
       const aiResult = await this.firstDiagnostic({
-        messages,
+        messages: _messages,
         conversation_id,
         user_id,
       });
 
       const appendResult = await this.secondDiagnostic({
         aiResult,
-        messages,
+        messages: _messages,
         conversation_id,
         user_id,
       });
@@ -45,6 +48,16 @@ class DiagnosticController {
         conversation_id,
         aiResult: mergedResult,
       });
+      if (channel_id) {
+        await insertRecord({
+          channel_id,
+          conversation_id,
+          diagnosis: mergedResult,
+          messages,
+          user_info,
+          mobile
+        });
+      }
       return updateResult;
     } catch (error) {
       let errorMessage = error.message;
@@ -100,6 +113,9 @@ ${aiResult.answer.diagnosis.differential_diagnosis}
   mergeDiagnostic(aiResult, appendResult) {
     aiResult.answer.diagnosis.differential_diagnosis = appendResult;
     return aiResult.answer;
+  }
+  getPureMessages (messages) {
+    return messages.map(item => ({content: item.content, role: item.role}))
   }
 }
 
