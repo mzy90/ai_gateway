@@ -9,7 +9,6 @@ class Record {
       const mobile = request.body?.mobile || null; // mobile 可选
       const page = Number(request.body.page) || 1;
       const pageSize = Number(request.body.pageSize) || 20;
-      const offset = (page - 1) * pageSize;
 
       if (!channel_id || !pageSize || !page) {
         return reply.code(400).send({
@@ -21,7 +20,7 @@ class Record {
         channel_id,
         mobile,
         pageSize,
-        offset,
+        page,
       });
 
       reply.send({
